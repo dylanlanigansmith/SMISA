@@ -1,5 +1,5 @@
 #  SMISA Instruction Set 
-
+this doc is out of date in a few important ways!! see ./emu/asm/ASM.sma for a better guide
 
 #### Instructions
 | Mnemonic | Opcode | Usage | Pseudo | Note |
@@ -68,3 +68,4 @@ Second Byte: Arguments
 
 if arg is const. byte or rel addr this will be that value
 
+## TODO UPDATE WITH SYNTAX FOR SMISASM
