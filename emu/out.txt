@@ -1,0 +1,93 @@
+Final Product: './build/smisa-emu'
+rm -rf ./build/smisa-emu.*
+cd src
+find . -type f -name '*.o' -delete
+src/main.o
+[ src/main.cpp ]
+c++ -std=c++17 -Og -I./include/   -c src/main.cpp -o src/main.o
+src/main.o
+c++ -std=c++17 -Og  src/main.o  -o ./build/smisa-emu
+././build/smisa-emu
+smisma-emu reloaded...  [mem_size=1000, debug=1] 
+loaded program...
+$0 | LADR = Decoding 0x8 [8]{0} 
+  - op = 8 = LADR 
+  - is_addr = 0 
+  - is_byte = 0 
+  - is_rel_addr = 0 
+  - is_RA = 0 
+  - is_RB = 0 
+  - is_RC = 0 
+  - args = 0 
+  0000 0000 0000 1000 
+
+
+== CPU Dump == 
+  Registers: 
+   - RA = 0x0 / 0 
+   - RB = 0x0 / 0
+   - RC = 0x0 / 0
+   - RX = 0x6 / 6
+   - RIP = 0x4 / 4
+  Stats: 
+   - MEM = 0x1000 bytes [4 kb] 
+$4 | JNE = Decoding 0x86 [86]{0} 
+  - op = 6 = JNE 
+  - is_addr = 0 
+  - is_byte = 0 
+  - is_rel_addr = 0 
+  - is_RA = 0 
+  - is_RB = 1 
+  - is_RC = 0 
+  - args = 0 
+  0000 0000 1000 0110 
+
+
+== CPU Dump == 
+  Registers: 
+   - RA = 0x0 / 0 
+   - RB = 0x0 / 0
+   - RC = 0x0 / 0
+   - RX = 0x6 / 6
+   - RIP = 0x6 / 6
+  Stats: 
+   - MEM = 0x1000 bytes [4 kb] 
+$6 | HLT = Decoding 0x6907 [7]{69} 
+  - op = 7 = HLT 
+  - is_addr = 0 
+  - is_byte = 0 
+  - is_rel_addr = 0 
+  - is_RA = 0 
+  - is_RB = 0 
+  - is_RC = 0 
+  - args = 69 
+  0110 1001 0000 0111 
+
+
+== CPU Dump == 
+  Registers: 
+   - RA = 0x0 / 0 
+   - RB = 0x0 / 0
+   - RC = 0x0 / 0
+   - RX = 0x6 / 6
+   - RIP = 0x6 / 6
+  Stats: 
+   - MEM = 0x1000 bytes [4 kb] 
+-- memory dump -- 
+ [0x0000] | 08 00 
+ [0x0002] | 06 00 
+ [0x0004] | 86 00 
+ [0x0006] | 07 69 
+ [0x0008] | 21 ff 
+ [0x000a] | 22 fe 
+ [0x000c] | a3 42 
+ [0x000e] | 43 0b 
+ [0x0010] | c3 0a 
+ [0x0012] | 21 01 
+ [0x0014] | c3 0a 
+ [0x0016] | 08 00 
+ [0x001a] | 22 42 
+ [0x001c] | c6 00 
+ [0x001e] | a3 11 
+ [0x0020] | 07 69 
+-- -- -- --
