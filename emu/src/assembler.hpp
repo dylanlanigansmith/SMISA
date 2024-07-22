@@ -7,6 +7,10 @@
 #define ASM_LABEL ':'
 #define ASM_ADDR '$'
 
+#define ASM_SRC_EXT "sma"
+#define ASM_BIN_EXT "bin"
+#define ASM_EXT_LEN 3
+
 
 
 //Symbol Stuff
@@ -140,7 +144,7 @@ int assembly_warning(const char* fmt, ...)
     set_logclr(LOG_YELLOW);
     va_list va;
     va_start(va, fmt);
-    printf("!!! Assembler Warning: \n    >");
+    printf("!!! Assembler Warning: \n    > ");
     vprintf(fmt, va);
     va_end(va);
     putc('\n', stdout);
@@ -164,7 +168,7 @@ int assembly_error(int err, const char* fmt, ...)
     va_list va;
     va_start(va, fmt);
 
-    printf("Assembler Error [%s]:  \n    >", magic_enum::enum_name<ASM_ERROR_LEVELS>((ASM_ERROR_LEVELS)err).data() );
+    printf("Assembler Error [%s]:  \n    > ", magic_enum::enum_name<ASM_ERROR_LEVELS>((ASM_ERROR_LEVELS)err).data() );
     vprintf(fmt, va);
     va_end(va);
 
@@ -173,3 +177,54 @@ int assembly_error(int err, const char* fmt, ...)
     return err;
 }
 
+
+//Program stuff
+
+struct program_t
+{
+    uint8_t* data;
+    size_t size;
+    bool ok = false;
+};
+
+
+void writeprog_bin(const char* filename, const program_t& prog) {
+    std::ofstream file(filename, std::ios::binary);
+    if (!file) {
+        assembly_error(ASM_MINOR, "Could not open file %s to write binary program", filename);
+        return;
+    }
+    file.write(reinterpret_cast<const char*>(prog.data), prog.size);
+    file.close();
+    if (file.fail()) {
+       assembly_error(ASM_MINOR, "Could not save binary program to %s", filename);
+    } else{
+        printf("wrote binary to %s \n", filename);
+    }
+}
+
+
+program_t readprog_bin (const char* filename) {
+
+    program_t prog = {.data = nullptr, .size = 0, .ok = false}; 
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    if (!file) {
+        assembly_error(ASM_MINOR, "Could not open file %s to load binary program", filename);
+        return prog;
+    }
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    prog.data = new uint8_t[size];
+    
+    if (file.read(reinterpret_cast<char*>(prog.data), size)) {
+        prog.size = size;
+        prog.ok = true;
+        printf("loaded program [%li] from bin file %s", prog.size, filename);
+        return prog;
+    } else {
+        delete[] prog.data; 
+        assembly_error(ASM_MINOR, "Loading binary program from file %s failed", filename);
+        return prog;
+    }
+}

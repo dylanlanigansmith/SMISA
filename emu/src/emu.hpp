@@ -99,14 +99,14 @@ struct cpu_t
 }
 
     void dump(const char* msg = "CPU Dump"){
-        set_logclr(LOG_CYAN); printf("== %s == \n", msg); reset_logclr();
+        set_logclr(LOG_CYAN); printf("== == %s == ==\n", msg); reset_logclr();
         printf("  Registers: \n");
          set_logclr(LOG_MAGENTA);
-        printf("   - RA = 0x%hhx / %hhu \n", RA, RA);
-        printf("   - RB = 0x%hhx / %hhu\n", RB, RB);
-        printf("   - RC = 0x%hhx / %hhu\n", RC, RC);
-        printf("   - RX = 0x%hx / %hu\n", RX, RX);
-        printf("   - RIP = 0x%hx / %hu\n", RIP, RIP);
+        printf("   - RA  = 0x%02hhx   / %5hhu \n", RA, RA);
+        printf("   - RB  = 0x%02hhx   / %5hhu\n", RB, RB);
+        printf("   - RC  = 0x%02hhx   / %5hhu\n", RC, RC);
+        printf("   - RX  = 0x%04hx / %5hu\n", RX, RX);
+        printf("   - RIP = 0x%04hx / %5hu\n", RIP, RIP);
         reset_logclr();
         printf("  Stats: \n");
         printf("   - MEM = 0x%lx bytes [%lu kb] \n", (size_t) MEM_SIZE, (size_t) MEM_SIZE / 1024);
@@ -115,7 +115,7 @@ struct cpu_t
 
     void dump_mem(bool all = false, size_t max = MEM_SIZE){
         set_logclr(LOG_CYAN);
-        printf("-- memory dump -- \n"); reset_logclr();
+        printf("-- -- memory dump -- -- \n"); reset_logclr();
         for(size_t i = 0; i < max; ++i){
             if(mem[i] == 0x0 && !all) continue;
 
@@ -123,7 +123,7 @@ struct cpu_t
             printf(" [0x%04lx] | %02hhx %02hhx | %c%c \n", i, mem[i], mem[i + 1], mem[i], mem[i + 1] );
             i += 1;
         }
-        set_logclr(LOG_CYAN); printf("-- -- -- --\n");reset_logclr();
+        set_logclr(LOG_CYAN); printf("-- -- -- -- -- -- -- -- \n");reset_logclr();
     }
 };
 

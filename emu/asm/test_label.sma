@@ -1,0 +1,22 @@
+; label test
+
+LD RC, 4
+START:
+SUB 1
+LADR END
+JNE RC
+LD RB, RC
+LD RC, RA
+ADD 1
+LD RA, RC
+LD RC, RB
+LADR START
+JMP 
+
+END:
+LADR 0x700
+LD $, RA
+LD RC, $
+ADD 5
+LD $, RC
+HLT

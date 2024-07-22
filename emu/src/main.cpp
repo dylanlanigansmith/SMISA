@@ -7,24 +7,8 @@ DLS 7.22.24
 #include "emu.hpp"
 
 
-struct program_t
-{
-    uint8_t* data;
-    size_t size;
-    bool ok = false;
-};
 
 
-
-uint16_t get_instruction_length(uint8_t instruction)
-{
-    switch(instruction){
-        case LADR:
-            return (uint16_t)4;
-        default:
-            return 2;
-    }
-}
 
 
 int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t& labels)
@@ -269,6 +253,7 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
 
 
 program_t assemble(const char* filename) {
+    printf("Assembling %s \n", filename);
     std::ifstream infile(filename);
     std::string line;
     int log_level = 0;
@@ -401,29 +386,15 @@ const uint8_t program[] =
     0b00000111, 0x77 // UKN / HLT
 };
 
-
-
-int main(int argc, const char * argv[]) {
-    // insert code here...
-    const opcode_t o = *(opcode_t*)(program);
-   // print_opcode(o);
-   // print_opcode(*(opcode_t*)(program + 2));
-   // print_opcode(*(opcode_t*)(program + 4));
-   // print_opcode(*(opcode_t*)(program + 6));
-    const char* filepath = "/Users/dylan/Code/SMISA/emu/asm/%s";
-    char path_buf[512];
-    snprintf(path_buf, 512, filepath, "str.sma");
-    auto p = assemble(path_buf);
-    if(!p.ok) return 1;
+int emulate(program_t& p)
+{
     if(p.size){
+        
         cpu.load_prog(p.data, p.size);
         //cpu.dump_mem(1, p.size + 4);
     }
-    
 
-  //return 0 ;
-
-    set_logclr(LOG_GREEN); puts("Loaded Program... \n Starting..."); reset_logclr();
+    set_logclr(LOG_GREEN); puts("Starting Loaded Program...\n"); reset_logclr();
 
     puts("Addr. |  Instruction                | ");
     puts("------------------------------------");
@@ -548,8 +519,85 @@ int main(int argc, const char * argv[]) {
 
         //cpu.dump();
     }
-
-    cpu.dump();
+    set_logclr(LOG_GREEN); puts("[reached HLT instruction, execution complete]\n"); reset_logclr(); 
+    cpu.dump("Final CPU State");
     cpu.dump_mem();
+   
     return 0;
+}
+
+int main(int argc, const char * argv[]) {
+    // insert code here...
+    const opcode_t o = *(opcode_t*)(program);
+   // print_opcode(o);
+   // print_opcode(*(opcode_t*)(program + 2));
+   // print_opcode(*(opcode_t*)(program + 4));
+   // print_opcode(*(opcode_t*)(program + 6));
+     const char* filepath = "/Users/dylan/Code/SMISA/emu/asm/%s";
+    char path_buf[512];
+
+    bool assem = false;
+    bool save_bin = false;
+    bool load_bin = false;
+    bool execute = false;
+   if(argc > 1){
+    if(!strcmp(argv[1], "make") && argc >= 2){
+        strncpy(path_buf, argv[2], 512);
+        assem = execute = true;
+    }
+    else if(!strcmp(argv[1], "asm") && argc >= 2){
+        strncpy(path_buf, argv[2], 512);
+        assem = save_bin = true;
+    }
+    else if(!strcmp(argv[1], "exec") && argc >= 2){
+        strncpy(path_buf, argv[2], 512);
+        load_bin = execute = true;
+    }
+    else{
+        set_logclr(LOG_CYAN);
+        puts("== SMISA assembler and emulator - DLS 2024 =="); reset_logclr();
+        puts("Usage: \n [cmd] make [asm file path] assembles and runs a file");
+        puts(" [cmd] asm [asm file path] assembles and saves a file");
+        puts(" [cmd] exec [binary file path] loads and runs an assembled file");
+
+    }
+   }else{
+     puts("no args, assuming dev mode");
+     snprintf(path_buf, 512, filepath, "ASM.sma");
+     assem = execute = true;
+   }
+   
+    auto p = program_t{0,0,0};
+
+
+
+    if(assem){
+        if(std::string(path_buf).substr(strlen(path_buf) - ASM_EXT_LEN) != ASM_SRC_EXT) {
+            set_logclr(LOG_RED); puts("Input file is not a SMIASM src file (.sma)\n"); reset_logclr(); return 1;
+        }
+        p = assemble(path_buf);
+        if(save_bin && p.ok && p.size){
+            std::string save_file = std::string(path_buf).substr(0, strlen(path_buf) - ASM_EXT_LEN);
+            save_file.append(ASM_BIN_EXT);
+            writeprog_bin(save_file.c_str(), p);
+        } 
+    } else if(load_bin){
+        if(std::string(path_buf).substr(strlen(path_buf) - ASM_EXT_LEN) != ASM_BIN_EXT) {
+            set_logclr(LOG_RED); puts("Input file is not binary (.bin)\n"); reset_logclr(); return 1;
+        }
+        p = readprog_bin(path_buf);
+    }
+   
+  
+
+
+
+    if(!p.ok){set_logclr(LOG_RED); puts("Error with loaded program \n"); reset_logclr(); return 1;}
+
+
+    if(!execute){
+            set_logclr(LOG_GREEN); puts("[Complete]\n"); reset_logclr(); return 0;
+    }
+
+    return emulate(p);
 }
