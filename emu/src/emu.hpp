@@ -3,7 +3,7 @@
 #include "shared.hpp"
 #include "assembler.hpp"
 
-
+#define MEM_SIZE 0x1000
 
 
 
@@ -13,19 +13,46 @@ enum OPERATIONS : uint8_t
     ADD,
     SUB,
     LD,
-    MOV,
+    INT,
     JMP,
     JNE,
     HLT,
     LADR, 
+    INC,
+
+    DUMMY = 16, //start of "fake ops"
+    JE,
+    DB,
 };
+
+
+
 
 
 enum REG_ARG_IDS : uint8_t {
     REG_A = 0xA,
     REG_B,
-    REG_C
+    REG_C,
+    REG_XL = 0xe,
+    REG_XH = 0xf
 };
+
+
+const std::unordered_map<std::string, uint8_t> reg_lookup =
+{
+    {"RA", REG_A}, {"RB", REG_B}, {"RC", REG_C}, {"RXL", REG_XL}, {"RXH", REG_XH}, 
+};
+
+uint8_t str_to_reg(const std::string& s){
+    return reg_lookup.at(s);
+}
+uint8_t str_to_reg_flags(const std::string& reg, uint8_t& is_RA, uint8_t& is_RB){
+    is_RA = (reg == "RA" || reg == "RC");
+    is_RB = (reg == "RB" || reg == "RC");
+
+    return (is_RB || is_RA);
+}
+
 
 struct opcode_t  
 {
@@ -44,16 +71,44 @@ struct opcode_t
 
 static_assert(sizeof(opcode_t) == 2);
 
+ struct cpu_rflags_t {
+        uint8_t interupt : 1;
+        uint8_t _res : 7;
+} __attribute__((packed));
+ static_assert(sizeof(cpu_rflags_t) == 1);
 
-#define MEM_SIZE 0x1000
+
 struct cpu_t
 {
     uint16_t RIP, RX;
     uint8_t RA, RB, RC;
+
+   
+   
+
+    uint8_t* RX_H, *RX_L; 
     uint8_t mem[MEM_SIZE]; //4k memory
+    
+
+    struct {
+        std::string strout;
+
+    } io;
+    cpu_t() { this->reset(); }
+    cpu_t(const cpu_t&) = delete;
+
+    void reset() {
+        memset(this, 0u, sizeof(cpu_t)); 
+
+        uint8_t* rx = (uint8_t*)(&this->RX);
+
+        RX_L = rx; 
+        RX_H = rx + 1;
+
+        printf("smisma-emu reloaded...  [mem_size=%x, debug=%d] \n", MEM_SIZE, DEBUG);  
 
 
-    void reset() { memset(this, 0u, sizeof(cpu_t)); printf("smisma-emu reloaded...  [mem_size=%x, debug=%d] \n", MEM_SIZE, DEBUG);  }
+    }
     void setmem(uint16_t addr, uint8_t val){
         if(!valid_address(addr)) return;
         mem[addr] = val;
@@ -79,7 +134,7 @@ struct cpu_t
         }
         return addr < MEM_SIZE;
     }
-    cpu_t() { this->reset(); }
+   
 
 
     bool load_prog(const uint8_t* prog, size_t len = MEM_SIZE){
@@ -94,19 +149,23 @@ struct cpu_t
         case REG_A: return &RA;
         case REG_B: return &RB;
         case REG_C: return &RC;
-        default: ERROR("get_reg_from_arg(): unknown reg type %hhx", ar); return &RC; //seg fault we aint checkin
+        case REG_XH: return RX_H;
+        case REG_XL: return RX_L;
+        default: ERROR("get_reg_from_arg(): unknown reg type %hhx", ar); return &RC; //throw exception once we have interupts
     }
 }
-
-    void dump(const char* msg = "CPU Dump"){
-        set_logclr(LOG_CYAN); printf("== == %s == ==\n", msg); reset_logclr();
-        printf("  Registers: \n");
-         set_logclr(LOG_MAGENTA);
+    void dump_registers(bool one_line = false){
         printf("   - RA  = 0x%02hhx   / %5hhu \n", RA, RA);
         printf("   - RB  = 0x%02hhx   / %5hhu\n", RB, RB);
         printf("   - RC  = 0x%02hhx   / %5hhu\n", RC, RC);
         printf("   - RX  = 0x%04hx / %5hu\n", RX, RX);
         printf("   - RIP = 0x%04hx / %5hu\n", RIP, RIP);
+    }
+    void dump(const char* msg = "CPU Dump"){
+        set_logclr(LOG_CYAN); printf("== == %s == ==\n", msg); reset_logclr();
+        printf("  Registers: \n");
+         set_logclr(LOG_MAGENTA);
+        dump_registers();
         reset_logclr();
         printf("  Stats: \n");
         printf("   - MEM = 0x%lx bytes [%lu kb] \n", (size_t) MEM_SIZE, (size_t) MEM_SIZE / 1024);

@@ -46,6 +46,7 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
         
 
          if(log_level > 3) std::cout << std::endl;
+        std::string op_str = tokens.front();
         auto op = magic_enum::enum_cast<OPERATIONS>(tokens.front());
         if(!op.has_value()){
             return assembly_error(ASM_FATAL, "Unknown Operation '%s' %02hhx", tokens.front().c_str(), std::atoi(tokens.front().c_str()));
@@ -115,35 +116,26 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
             }
             
             //todo addr
-
+            bool addr_reg = is_address_reg(tokens.at(1).c_str()) || is_address_reg(tokens.at(2).c_str());
 
             if(dest_isreg){
                 std::string reg = tokens.at(1);
                 for (auto & c: reg) c = toupper(c);
 
-                if(reg == "RA"){
-                    oc.is_RA = 1;
-                } 
-                else if (reg == "RB"){
-                    oc.is_RB = 1;
+                if(is_address_reg(reg.c_str())){
+                    oc.is_addr = 1; oc.is_byte = 1; 
+                    oc.is_RA = (reg == "RXH");
                 }
-                else if(reg == "RC") {
-                    oc.is_RA = oc.is_RB = 1;
-                } 
+                else{
+                    oc.is_RA = (reg == "RA" || reg == "RC");
+                    oc.is_RB = (reg == "RB" || reg == "RC");
+                }
             }
 
             if(src_isreg){
                 std::string reg = tokens.at(2);
                 for (auto & c: reg) c = toupper(c);
-                if(reg == "RA"){
-                    oc.args = REG_A;
-                } 
-                else if (reg == "RB"){
-                    oc.args = REG_B;
-                }
-                else if(reg == "RC") {
-                    oc.args = REG_C;
-                } 
+                oc.args = str_to_reg(reg);
             }
             
             if(src_isbyte){
@@ -155,6 +147,8 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
             if(!oc.is_addr)
                 oc.is_addr = dest_isaddr;
             
+            if(dest_isaddr && addr_reg) oc.is_RB = 1; 
+
             assembly.push_back(oc);
             if(dest_isaddr){
                 assembly.push_back(hexstr_to<uint16_t>(tokens.at(1))); 
@@ -179,21 +173,20 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
             bool src_isbyte = (src_isreg) ? false : is_hexstr(tokens.at(1));
             //todo addr
 
-
+            bool address_reg = false;
 
             if(src_isreg){
                 std::string reg = tokens.at(1);
                 for (auto & c: reg) c = toupper(c);
 
-                if(reg == "RA"){
-                    oc.is_RA = 1;
-                } 
-                else if (reg == "RB"){
-                    oc.is_RB = 1;
+                if(address_reg = is_address_reg(reg.c_str()); address_reg ){
+                    oc.is_addr = 1; oc.is_byte = 1; 
+                    oc.is_RA = (reg == "RXH");
                 }
-                else if(reg == "RC") {
-                    oc.is_RA = oc.is_RB = 1;
-                } 
+                else{
+                    oc.is_RA = (reg == "RA" || reg == "RC");
+                    oc.is_RB = (reg == "RB" || reg == "RC");
+                }
             }            
             if(src_isbyte){
                 oc.is_byte = 1;
@@ -201,17 +194,19 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
                 oc.args = (uint8_t)(u16 & 0xff);
             }
 
-
-            oc.is_addr = src_isaddr;
+            if(!address_reg)
+                oc.is_addr = src_isaddr;
             
             assembly.push_back(oc);
             
             //printf("srcr %u destr %u b %u ad %u args %x \n",src_isreg, dest_isreg, src_isbyte, dest_isaddr, oc.args);
-           // print_opcode(oc);
+           
             break;
         }
+        case JE:
         case JNE: {
-            opcode_t oc = { .op = JNE, .is_addr = 0, .is_byte = 0, .is_RA = 0, .is_RB = 0, .args = 0 };   
+            bool is_jne = op_str.c_str()[1] == 'N'; 
+            opcode_t oc = { .op = JNE, .is_addr = 0, .is_byte = 0, .is_RA = 0, .is_RB = 0, .args = (is_jne) ? (uint8_t)0 : (uint8_t)0xff };   
             bool src_isreg =  symbol_exists(tokens.at(1).c_str(), symbols_reg);
             assert(src_isreg);
              if(src_isreg){
@@ -234,6 +229,53 @@ int assemble_line(std::string line, std::vector<uint16_t>& assembly, label_map_t
         }
         case JMP:{
             opcode_t oc = { .op = JMP, .is_addr = 0, .is_byte = 0, .is_RA = 0, .is_RB = 0, .args = 0 };   
+            assembly.push_back(oc);  
+            break;
+        }
+        case INC:{
+            opcode_t oc = { .op = INC, .is_addr = 0, .is_byte = 0, .is_RA = 0, .is_RB = 0, .args = 0 };   
+            bool dest_isreg = symbol_exists(tokens.at(1).c_str(), symbols_reg); //overkill for what could be first char = R 
+            bool dest_isaddr = (dest_isreg) ? false : is_hexstr(tokens.at(1)) || tokens.at(1).at(0) == ASM_ADDR ;
+            if(dest_isreg){
+                 std::string reg = tokens.at(1);
+                for (auto & c: reg) c = toupper(c);
+                oc.args = str_to_reg(reg);
+            }
+            else if(dest_isaddr){
+                oc.is_addr = 1;
+            }
+            assembly.push_back(oc);  
+            
+            break;
+        }
+        case INT:{
+            opcode_t oc = { .op = INT, .is_addr = 0, .is_byte = 0, .is_RA = 0, .is_RB = 0, .args = 0 };   
+            bool src_isreg =  symbol_exists(tokens.at(1).c_str(), symbols_reg);
+            bool src_isbyte = (src_isreg) ? false : is_hexstr(tokens.at(1));
+            if(src_isreg){
+                 std::string reg = tokens.at(2);
+                for (auto & c: reg) c = toupper(c);
+                if(is_address_reg(reg.c_str())){
+                    oc.is_addr = oc.is_byte = 1; 
+                    oc.args =  (reg == "RXL") ? REG_XL : REG_XH;
+                }
+                else{
+                    if(reg == "RA"){
+                    oc.args = REG_A;
+                    } 
+                    else if (reg == "RB"){
+                        oc.args = REG_B;
+                    }
+                    else if(reg == "RC") {
+                        oc.args = REG_C;
+                    } 
+                }
+            }
+            if(src_isbyte){
+                oc.is_byte = 1;
+                uint16_t u16 = hexstr_to<uint16_t>(tokens.at(1)); //dont ask
+                oc.args = (uint8_t)(u16 & 0xff);
+            }
             assembly.push_back(oc);  
             break;
         }
@@ -267,7 +309,7 @@ program_t assemble(const char* filename) {
 
     label_map_t labels;
     puts("Running preprocessor");
-    while(std::getline(infile, line)){
+    while(std::getline(infile, line)){ //get line vec first and use it from here on so u can do shit like add line nums to label references! 
         if(line.empty()) continue;
         std::vector<std::string> raw_tokens = split(line);
         if(raw_tokens.empty()) continue;
@@ -343,7 +385,7 @@ program_t assemble(const char* filename) {
         //std::cout << label_str(entry, true) << std::endl;
    }
    printf("resolved %d symbols\n", resolved);
-    if(log_level) print_labels(labels);
+    if(log_level || 1) print_labels(labels);
     infile.close();
     prog.size = assembly.size() * 2; //size in bytes
     prog.data = new uint8_t[prog.size];
@@ -416,6 +458,13 @@ int emulate(program_t& p)
         switch (instruction->op)
         {
         case ADD:
+            if( instruction->is_addr && instruction->is_byte && !(instruction->is_RB)){
+                //RXH RXL 
+                //if(!is_RB) reg arg refers to RX MSB/LSB (msb if is_RA = 1)
+                uint8_t reg = (instruction->is_RA) ? *cpu.RX_H : *cpu.RX_L;
+                cpu.RC += reg; break;
+                
+            }
             if(instruction->is_byte){
                 cpu.RC += instruction->args; break;
             }
@@ -423,7 +472,7 @@ int emulate(program_t& p)
                 cpu.RC += cpu.getmem(); break;
                 //no rel yet
             } 
-
+          
             if(instruction->is_RA && instruction->is_RB){
                 cpu.RC += cpu.RC;
             } else if (instruction->is_RA) {
@@ -434,6 +483,13 @@ int emulate(program_t& p)
             } 
             break;
         case SUB:
+             if( instruction->is_addr && instruction->is_byte && !(instruction->is_RB)){
+                //RXH RXL 
+                //if(!is_RB) reg arg refers to RX MSB/LSB (msb if is_RA = 1)
+                uint8_t reg = (instruction->is_RA) ? *cpu.RX_H : *cpu.RX_L;
+                cpu.RC -= reg; break;
+                
+            }
             if(instruction->is_byte){
                 cpu.RC -= instruction->args; break;
             }
@@ -452,7 +508,17 @@ int emulate(program_t& p)
             } 
             break;
         case LD:
-            if(instruction->is_byte){
+            if( instruction->is_addr && instruction->is_byte && !(instruction->is_RB)){
+                    //RXH RXL 
+                    //if(!is_RB) reg arg refers to RX MSB/LSB (msb if is_RA = 1)
+                    uint8_t* dest_reg = (instruction->is_RA) ? cpu.RX_H : cpu.RX_L;
+                    
+                    uint8_t* src_reg = cpu.get_reg_from_arg(instruction->args); 
+                    *dest_reg = *src_reg;
+                    //!(instruction->is_RB) use for arg = byte or reg
+            }
+            else if(instruction->is_byte){
+        
                 if(instruction->is_RA && instruction->is_RB){
                     cpu.RC = instruction->args;
                 } else if (instruction->is_RA) {
@@ -466,7 +532,7 @@ int emulate(program_t& p)
             }
             else{
                 uint8_t* r = (instruction->is_RA && instruction->is_RB) ? ( &cpu.RC) : ( ( instruction->is_RA ) ? &cpu.RA : &cpu.RB ); //sorry
-
+              
                 if (instruction->is_addr){
                     if(!instruction->is_RA && !instruction->is_RB) {
                         r = cpu.get_reg_from_arg(instruction->args); //so is_addr flag with no reg flags = set reg to value at addr
@@ -483,23 +549,90 @@ int emulate(program_t& p)
                     *r = *cpu.get_reg_from_arg(instruction->args);
                 }
             } 
+        //    print_opcode(*instruction);
             break;
-        case MOV:
-            break; //probs irrel
-        case JNE:
+        case INT:{
+            uint8_t n = 0xff;
+            if(instruction->is_byte)
+                n = instruction->args;
+            else n = *cpu.get_reg_from_arg(instruction->args);
+
+
+            switch(n)
+            {
+                case 0x2:{
+                    //putc RA
+                    char c = (char)cpu.RA;
+                    char cc[2] = {c,0};
+                    cpu.io.strout.append(cc);
+                    printf(">%s \n", cc);
+                    break;
+                } 
+                case 0x4:
+                case 0x3:{
+                    //trap to debugger
+                    set_logclr(LOG_YELLOW);
+                    puts("Reached breakpoint, dumping and continuing... "); 
+                    cpu.dump_registers();
+
+                    reset_logclr();
+
+                    if(n == 0x4){
+                        puts("** PRESS ENTER TO CONTINUE **");
+                        std::string idc;
+                        std::getline(std::cin, idc);
+                    }
+                    break;
+                }
+                
+                case 0xff:
+                default:{
+                     ERROR("Unknown or unhandled interupt 0x%hhx at $RIP= %hx", n, cpu.RIP); break;
+                }
+                    
+            }
+            break;
+        }
+        case INC:{
+            if(instruction->is_addr){
+                cpu.RX++;
+            } else{
+                auto r = cpu.get_reg_from_arg(instruction->args);
+                *r += 1; 
+            }
+            break;
+        }
+        
+        
+        case JNE:{
+            if(instruction->args == 0xff) { //je
+                if(instruction->is_RA && instruction->is_RB){
+                if(!cpu.RC) break;
+            } else if (instruction->is_RA) {
+                if(!cpu.RA) break;
+            } else if (instruction->is_RB) { 
+                 if(!cpu.RB) break;
+            } 
+         
+                if ( (instruction->is_addr && !cpu.getmem()) ) break;
+            } 
+            else{
             if(instruction->is_RA && instruction->is_RB){
                 if(cpu.RC) break;
             } else if (instruction->is_RA) {
                 if(cpu.RA) break;
             } else if (instruction->is_RB) { 
-                 if(cpu.RB) break;
+                if(cpu.RB) break;
             } 
-         
-           if ( (instruction->is_addr && cpu.RX) ) break;
+            
+            if ( (instruction->is_addr && cpu.getmem()) ) break;
+            }
+ 
             
             cpu.RIP = cpu.RX;
             instruction_size = 0;
             break;
+        }
         case JMP:
             cpu.RIP = cpu.RX;
              instruction_size = 0;
@@ -519,7 +652,16 @@ int emulate(program_t& p)
 
         //cpu.dump();
     }
+    
+   
     set_logclr(LOG_GREEN); puts("[reached HLT instruction, execution complete]\n"); reset_logclr(); 
+    if(cpu.io.strout.size()){
+         set_logclr(LOG_CYAN);
+        printf("Program Output: ");
+        reset_logclr();
+        puts(cpu.io.strout.c_str());
+    }
+    
     cpu.dump("Final CPU State");
     cpu.dump_mem();
    
@@ -541,30 +683,30 @@ int main(int argc, const char * argv[]) {
     bool load_bin = false;
     bool execute = false;
    if(argc > 1){
-    if(!strcmp(argv[1], "make") && argc >= 2){
-        strncpy(path_buf, argv[2], 512);
-        assem = execute = true;
-    }
-    else if(!strcmp(argv[1], "asm") && argc >= 2){
-        strncpy(path_buf, argv[2], 512);
-        assem = save_bin = true;
-    }
-    else if(!strcmp(argv[1], "exec") && argc >= 2){
-        strncpy(path_buf, argv[2], 512);
-        load_bin = execute = true;
-    }
-    else{
-        set_logclr(LOG_CYAN);
-        puts("== SMISA assembler and emulator - DLS 2024 =="); reset_logclr();
-        puts("Usage: \n [cmd] make [asm file path] assembles and runs a file");
-        puts(" [cmd] asm [asm file path] assembles and saves a file");
-        puts(" [cmd] exec [binary file path] loads and runs an assembled file");
+        if(!strcmp(argv[1], "make") && argc >= 2){
+            strncpy(path_buf, argv[2], 512);
+            assem = execute = true;
+        }
+        else if(!strcmp(argv[1], "asm") && argc >= 2){
+            strncpy(path_buf, argv[2], 512);
+            assem = save_bin = true;
+        }
+        else if(!strcmp(argv[1], "exec") && argc >= 2){
+            strncpy(path_buf, argv[2], 512);
+            load_bin = execute = true;
+        }
+        else{
+            set_logclr(LOG_CYAN);
+            puts("== SMISA assembler and emulator - DLS 2024 =="); reset_logclr();
+            puts("Usage: \n [cmd] make [asm file path] assembles and runs a file");
+            puts(" [cmd] asm [asm file path] assembles and saves a file");
+            puts(" [cmd] exec [binary file path] loads and runs an assembled file");
 
-    }
-   }else{
-     puts("no args, assuming dev mode");
-     snprintf(path_buf, 512, filepath, "ASM.sma");
-     assem = execute = true;
+        }
+   } else {
+        puts("no args, assuming dev mode");
+        snprintf(path_buf, 512, filepath, "test.sma");
+        assem = execute = true;
    }
    
     auto p = program_t{0,0,0};

@@ -15,8 +15,13 @@
 
 //Symbol Stuff
 
+bool is_address_reg(const char* r){
+    //dont need to len check bc we are always gonna have 2 chars, just might be null term as last 
+    return (r && ( r[1] == 'X' || r[1] == 'x') );
+}
+
 const std::vector<const char*> symbols_reg = {
-    "RA", "RB","RC"
+    "RA", "RB","RC", "RXL", "RXH"
 };
 
 bool symbol_exists(const char* to_find, const std::vector<const char*>& symbols){
